@@ -11,3 +11,4 @@ python-dotenv
 tavily-python
 langchain-qdrant
 pydantic
+firecrawl

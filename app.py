@@ -570,8 +570,6 @@ SAMPLE_TICKETS = [
         "subject": "Best practices for data governance policies",
         "body": "We're looking for recommendations on how to structure our data governance framework in Atlan. What are the best practices for setting up policies, classifications, and ownership?"
     }
-
-
 ]
 
 class VerboseCapture:
