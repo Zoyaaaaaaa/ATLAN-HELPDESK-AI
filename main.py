@@ -1,332 +1,3 @@
-# import streamlit as st
-# import json
-# import os
-# from datetime import datetime
-# import uuid
-# import requests
-# import re
-# from urllib.parse import urlparse
-# from typing import List, Dict, Any, Optional
-# import time
-
-# # Import your existing components
-# from langchain import hub
-# from langchain.agents import AgentExecutor, create_structured_chat_agent
-# from langchain_community.tools.tavily_search import TavilySearchResults
-# from langchain_groq import ChatGroq
-# from sentence_transformers import SentenceTransformer
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from qdrant_client import QdrantClient
-# from qdrant_client.http import models as rest
-
-# # Set environment variables
-# os.environ["TAVILY_API_KEY"] = "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"
-# os.environ["GOOGLE_API_KEY"] = "AIzaSyCsw7V4iXwPOdXRDAO1BwZOhM9WbJ-gR_U"
-# os.environ["GROQ_API_KEY"] = "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"
-
-# # Initialize the enhanced knowledge base (your existing code)
-# from services.knowledge_base import EnhancedAtlanKnowledgeBase
-
-
-# # Initialize the AI classifier
-# class AtlanTicketClassifier:
-#     def __init__(self):
-#         self.llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        
-#     def classify_ticket(self, ticket_text):
-#         classification_prompt = f"""
-#         Analyze the following customer support ticket and classify it according to the specified schema.
-        
-#         TICKET TEXT:
-#         {ticket_text}
-        
-#         CLASSIFICATION SCHEMA:
-#         1. Topic Tags: Choose from How-to, Product, Connector, Lineage, API/SDK, SSO, Glossary, Best practices, Sensitive data
-#         2. Sentiment: Choose from Frustrated, Curious, Angry, Neutral
-#         3. Priority: Choose from P0 (High), P1 (Medium), P2 (Low)
-        
-#         Return your response as a valid JSON object with the following structure:
-#         {{
-#             "topic_tags": ["tag1", "tag2"],
-#             "sentiment": "sentiment_value",
-#             "priority": "priority_value"
-#         }}
-#         """
-        
-#         try:
-#             response = self.llm.invoke(classification_prompt)
-#             # Extract JSON from response
-#             json_str = response.content.strip()
-#             # Clean up the response to extract just the JSON
-#             json_match = re.search(r'\{.*\}', json_str, re.DOTALL)
-#             if json_match:
-#                 json_str = json_match.group(0)
-#                 classification = json.loads(json_str)
-#                 return classification
-#             else:
-#                 # Fallback if JSON parsing fails
-#                 return {
-#                     "topic_tags": ["Product"],
-#                     "sentiment": "Neutral",
-#                     "priority": "P1 (Medium)"
-#                 }
-#         except Exception as e:
-#             st.error(f"Classification error: {e}")
-#             return {
-#                 "topic_tags": ["Product"],
-#                 "sentiment": "Neutral",
-#                 "priority": "P1 (Medium)"
-#             }
-
-# # Initialize the RAG agent
-# class AtlanRAGAgent:
-#     def __init__(self, knowledge_base):
-#         self.kb = knowledge_base
-#         self.llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        
-#     def generate_response(self, query, classification):
-#         # Internal analysis view
-#         internal_analysis = {
-#             "classification": classification,
-#             "timestamp": datetime.now().isoformat(),
-#             "query": query
-#         }
-        
-#         # Check if we should use RAG or just route the ticket
-#         rag_topics = ["How-to", "Product", "Best practices", "API/SDK", "SSO"]
-#         use_rag = any(topic in rag_topics for topic in classification["topic_tags"])
-        
-#         if use_rag:
-#             # Determine which knowledge base category to use
-#             if any(topic in ["API/SDK"] for topic in classification["topic_tags"]):
-#                 category_filter = "developer_hub"
-#             else:
-#                 category_filter = "product_documentation"
-                
-#             # Generate RAG response
-#             rag_response = self.kb.generate_rag_response(query, category_filter=category_filter)
-            
-#             # Final response view
-#             final_response = {
-#                 "answer": rag_response["answer"],
-#                 "sources": rag_response["sources"],
-#                 "type": "RAG Response"
-#             }
-#         else:
-#             # Route the ticket
-#             final_response = {
-#                 "answer": f"This ticket has been classified as a '{classification['topic_tags'][0]}' issue and routed to the appropriate team.",
-#                 "sources": [],
-#                 "type": "Routing Response"
-#             }
-            
-#         return {
-#             "internal_analysis": internal_analysis,
-#             "final_response": final_response
-#         }
-
-# # Load sample tickets
-# def load_sample_tickets():
-#     # In a real application, you would load from a file
-#     # For now, using the provided example and some additional ones
-#     return [
-#         {
-#             "id": "TICKET-245",
-#             "subject": "Connecting Snowflake to Atlan - required permissions?",
-#             "body": "Hi team, we're trying to set up our primary Snowflake production database as a new source in Atlan, but the connection keeps failing. We've tried using our standard service account, but it's not working. Our entire BI team is blocked on this integration for a major upcoming project, so it's quite urgent. Could you please provide a definitive list of the exact permissions and credentials needed on the Snowflake side to get this working? Thanks."
-#         },
-#         {
-#             "id": "TICKET-301",
-#             "subject": "How to create custom lineage in Atlan?",
-#             "body": "I need to create custom lineage for our ETL processes that aren't automatically captured. The documentation seems sparse on this topic. Can you provide a step-by-step guide?"
-#         },
-#         {
-#             "id": "TICKET-422",
-#             "subject": "API authentication issues",
-#             "body": "I'm getting a 401 error when trying to authenticate with the Atlan API using my service account credentials. The same credentials work in the UI. What could be causing this?"
-#         }
-#     ]
-
-# # Streamlit application
-# def main():
-#     st.set_page_config(
-#         page_title="Atlan Helpdesk AI",
-#         page_icon="🔍",
-#         layout="wide",
-#         initial_sidebar_state="expanded"
-#     )
-    
-#     # Custom CSS
-#     st.markdown("""
-#     <style>
-#     .main-header {
-#         font-size: 3rem;
-#         color: #1E3A8A;
-#         text-align: center;
-#         margin-bottom: 2rem;
-#     }
-#     .sub-header {
-#         font-size: 1.5rem;
-#         color: #3B82F6;
-#         margin-top: 1.5rem;
-#         margin-bottom: 1rem;
-#     }
-#     .ticket-card {
-#         padding: 1rem;
-#         border-radius: 0.5rem;
-#         border-left: 4px solid #3B82F6;
-#         background-color: #F3F4F6;
-#         margin-bottom: 1rem;
-#     }
-#     .classification-badge {
-#         display: inline-block;
-#         padding: 0.25rem 0.5rem;
-#         border-radius: 0.25rem;
-#         font-size: 0.8rem;
-#         margin-right: 0.5rem;
-#         margin-bottom: 0.5rem;
-#     }
-#     .topic-badge {
-#         background-color: #DBEAFE;
-#         color: #1E40AF;
-#     }
-#     .sentiment-badge {
-#         background-color: #FCE7F3;
-#         color: #9D174D;
-#     }
-#     .priority-badge {
-#         background-color: #FEF3C7;
-#         color: #92400E;
-#     }
-#     .internal-analysis {
-#         background-color: #FEF3C7;
-#         padding: 1rem;
-#         border-radius: 0.5rem;
-#         margin-bottom: 1rem;
-#     }
-#     .final-response {
-#         background-color: #D1FAE5;
-#         padding: 1rem;
-#         border-radius: 0.5rem;
-#     }
-#     </style>
-#     """, unsafe_allow_html=True)
-    
-#     st.markdown('<h1 class="main-header">🔍 Atlan Helpdesk AI Assistant</h1>', unsafe_allow_html=True)
-    
-#     # Initialize components (with caching to avoid reinitialization)
-#     @st.cache_resource
-#     def init_knowledge_base():
-#         return EnhancedAtlanKnowledgeBase()
-    
-#     @st.cache_resource
-#     def init_classifier():
-#         return AtlanTicketClassifier()
-    
-#     @st.cache_resource
-#     def init_rag_agent(_kb):
-#         return AtlanRAGAgent(_kb)
-    
-#     # Initialize components
-#     with st.spinner("Initializing AI components..."):
-#         kb = init_knowledge_base()
-#         classifier = init_classifier()
-#         rag_agent = init_rag_agent(kb)
-    
-#     # Create tabs for different functionalities
-#     tab1, tab2 = st.tabs(["Bulk Ticket Classification", "Interactive AI Agent"])
-    
-#     with tab1:
-#         st.markdown('<h2 class="sub-header">Bulk Ticket Classification Dashboard</h2>', unsafe_allow_html=True)
-        
-#         # Load sample tickets
-#         sample_tickets = load_sample_tickets()
-        
-#         # Classify all tickets
-#         if 'classified_tickets' not in st.session_state:
-#             with st.spinner("Classifying tickets..."):
-#                 classified_tickets = []
-#                 for ticket in sample_tickets:
-#                     # Combine subject and body for classification
-#                     ticket_text = f"Subject: {ticket['subject']}\n\nBody: {ticket['body']}"
-#                     classification = classifier.classify_ticket(ticket_text)
-#                     classified_tickets.append({
-#                         **ticket,
-#                         "classification": classification
-#                     })
-#                 st.session_state.classified_tickets = classified_tickets
-        
-#         # Display classified tickets
-#         for ticket in st.session_state.classified_tickets:
-#             with st.container():
-#                 st.markdown(f"""
-#                 <div class="ticket-card">
-#                     <h3>{ticket['subject']} <span style="font-size: 0.8rem; color: #6B7280;">({ticket['id']})</span></h3>
-#                     <p>{ticket['body'][:200]}...</p>
-#                     <div>
-#                         <strong>Classification:</strong><br>
-#                         <span class="classification-badge topic-badge">Topics: {', '.join(ticket['classification']['topic_tags'])}</span>
-#                         <span class="classification-badge sentiment-badge">Sentiment: {ticket['classification']['sentiment']}</span>
-#                         <span class="classification-badge priority-badge">Priority: {ticket['classification']['priority']}</span>
-#                     </div>
-#                 </div>
-#                 """, unsafe_allow_html=True)
-    
-#     with tab2:
-#         st.markdown('<h2 class="sub-header">Interactive AI Agent</h2>', unsafe_allow_html=True)
-        
-#         # Input for new ticket
-#         new_ticket = st.text_area(
-#             "Enter a new ticket or question:",
-#             placeholder="Describe your issue or question here...",
-#             height=150
-#         )
-        
-#         if st.button("Submit Ticket", type="primary"):
-#             if new_ticket:
-#                 with st.spinner("Analyzing ticket..."):
-#                     # Classify the ticket
-#                     classification = classifier.classify_ticket(new_ticket)
-                    
-#                     # Generate response
-#                     response = rag_agent.generate_response(new_ticket, classification)
-                    
-#                     # Store in session state
-#                     st.session_state.current_response = response
-#                     st.session_state.current_ticket = new_ticket
-#                     st.session_state.current_classification = classification
-#             else:
-#                 st.warning("Please enter a ticket or question before submitting.")
-        
-#         # Display results if available
-#         if 'current_response' in st.session_state:
-#             st.markdown("---")
-#             st.markdown("### Analysis Results")
-            
-#             # Internal analysis view
-#             st.markdown("#### Internal Analysis View")
-#             st.markdown('<div class="internal-analysis">', unsafe_allow_html=True)
-#             st.json(st.session_state.current_response["internal_analysis"])
-#             st.markdown('</div>', unsafe_allow_html=True)
-            
-#             # Final response view
-#             st.markdown("#### Final Response View")
-#             st.markdown('<div class="final-response">', unsafe_allow_html=True)
-#             st.write(st.session_state.current_response["final_response"]["answer"])
-            
-#             # Display sources if available
-#             if st.session_state.current_response["final_response"]["sources"]:
-#                 st.markdown("##### Sources:")
-#                 for i, source in enumerate(st.session_state.current_response["final_response"]["sources"]):
-#                     st.markdown(f"{i+1}. [{source['title']}]({source['url']})")
-            
-#             st.markdown('</div>', unsafe_allow_html=True)
-
-# if __name__ == "__main__":
-#     main()
-
-
-
 import streamlit as st
 import json
 import os
@@ -338,8 +9,6 @@ from urllib.parse import urlparse
 from typing import List, Dict, Any, Optional
 import time
 import logging
-
-# Import your existing components
 from langchain import hub
 from langchain.agents import AgentExecutor, create_structured_chat_agent
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -348,16 +17,15 @@ from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as rest
-
-# Set environment variables
-os.environ["TAVILY_API_KEY"] = "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"
-os.environ["GOOGLE_API_KEY"] = "AIzaSyCsw7V4iXwPOdXRDAO1BwZOhM9WbJ-gR_U"
-os.environ["GROQ_API_KEY"] = "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"
-
-# Initialize the enhanced knowledge base (your existing code)
+from services import analytics_service,monitoring_service
+from config.settings import settings
+# from services.ticket_classifier import TicketClassifier as AtlanTicketClassifier,AtlanRAGAgent
+from services.ticket_classifier import AtlanRAGAgent
 from services.knowledge_base import EnhancedAtlanKnowledgeBase
+monitor=monitoring_service.SystemMonitor
 
-# Enhanced AI classifier with verbose logging
+os.environ["GROQ_API_KEY"] = settings.GROQ_API_KEY
+
 class AtlanTicketClassifier:
     def __init__(self):
         self.llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
@@ -435,7 +103,6 @@ class AtlanTicketClassifier:
                 
             return fallback, verbose_logs if verbose else fallback
 
-# Enhanced RAG agent with verbose logging
 class AtlanRAGAgent:
     def __init__(self, knowledge_base):
         self.kb = knowledge_base
@@ -514,161 +181,16 @@ class AtlanRAGAgent:
             "processing_time": processing_time
         }
 
-# Load sample tickets with more examples
-def load_sample_tickets():
-    return [
- {
-   "id": "TICKET-245",
-   "subject": "Connecting Snowflake to Atlan - required permissions?",
-   "body": "Hi team, we're trying to set up our primary Snowflake production database as a new source in Atlan, but the connection keeps failing. We've tried using our standard service account, but it's not working. Our entire BI team is blocked on this integration for a major upcoming project, so it's quite urgent. Could you please provide a definitive list of the exact permissions and credentials needed on the Snowflake side to get this working? Thanks."
- },
- {
-   "id": "TICKET-246",
-   "subject": "Which connectors automatically capture lineage?",
-   "body": "Hello, I'm new to Atlan and trying to understand the lineage capabilities. The documentation mentions automatic lineage, but it's not clear which of our connectors (we use Fivetran, dbt, and Tableau) support this out-of-the-box. We need to present a clear picture of our data flow to leadership next week. Can you explain how lineage capture differs for these tools?"
- },
- {
-   "id": "TICKET-247",
-   "subject": "Deployment of Atlan agent for private data lake",
-   "body": "Our primary data lake is hosted on-premise within a secure VPC and is not exposed to the internet. We understand we need to use the Atlan agent for this, but the setup instructions are a bit confusing for our security team. This is a critical source for us, and we can't proceed with our rollout until we get this connected. Can you provide a detailed deployment guide or connect us with a technical expert?"
- },
- {
-   "id": "TICKET-248",
-   "subject": "How to surface sample rows and schema changes?",
-   "body": "Hi, we've successfully connected our Redshift cluster, and the assets are showing up. However, my data analysts are asking how they can see sample data or recent schema changes directly within Atlan without having to go back to Redshift. Is this feature available? I feel like I'm missing something obvious."
- },
- {
-   "id": "TICKET-249",
-   "subject": "Exporting lineage view for a specific table",
-   "body": "For our quarterly audit, I need to provide a complete upstream and downstream lineage diagram for our core `fact_orders` table. I can see the lineage perfectly in the UI, but I can't find an option to export this view as an image or PDF. This is a hard requirement from our compliance team and the deadline is approaching fast. Please help!"
- },
- {
-   "id": "TICKET-250",
-   "subject": "Importing lineage from Airflow jobs",
-   "body": "We run hundreds of ETL jobs in Airflow, and we need to see that lineage reflected in Atlan. I've read that Atlan can integrate with Airflow, but how do we configure it to correctly map our DAGs to the specific datasets they are transforming? The current documentation is a bit high-level."
- },
- {
-   "id": "TICKET-251",
-   "subject": "Using the Visual Query Builder",
-   "body": "I'm a business analyst and not very comfortable with writing complex SQL. I was excited to see the Visual Query Builder in Atlan, but I'm having trouble figuring out how to join multiple tables and save my query for later use. Is there a tutorial or a quick guide you can point me to?"
- },
- {
-   "id": "TICKET-252",
-   "subject": "Programmatic extraction of lineage",
-   "body": "Our internal data science team wants to build a custom application that analyzes metadata propagation delays. To do this, we need to programmatically extract lineage data from Atlan via an API. Does the API expose lineage information, and if so, could you provide an example of the endpoint and the structure of the response?"
- },
- {
-   "id": "TICKET-253",
-   "subject": "Upstream lineage to Snowflake view not working",
-   "body": "This is infuriating. We have a critical Snowflake view, `finance.daily_revenue`, that is built from three upstream tables. Atlan is correctly showing the downstream dependencies, but the upstream lineage is completely missing. This makes the view untrustworthy for our analysts. We've re-run the crawler multiple times. What could be causing this? This is a huge problem for us."
- },
- {
-   "id": "TICKET-254",
-   "subject": "How to create a business glossary and link terms in bulk?",
-   "body": "We are migrating our existing business glossary from a spreadsheet into Atlan. We have over 500 terms. Manually creating each one and linking them to thousands of assets seems impossible. Is there a bulk import feature using CSV or an API to create terms and link them to assets? This is blocking our entire governance initiative."
- },
- {
-   "id": "TICKET-255",
-   "subject": "Creating a custom role for data stewards",
-   "body": "I'm trying to set up a custom role for our data stewards. They need permission to edit descriptions and link glossary terms, but they should NOT have permission to run queries or change connection settings. I'm looking at the default roles, but none of them fit perfectly. How can I create a new role with this specific set of permissions?"
- },
- {
-   "id": "TICKET-256",
-   "subject": "Mapping Active Directory groups to Atlan teams",
-   "body": "Our company policy requires us to manage all user access through Active Directory groups. We need to map our existing AD groups (e.g., 'data-analyst-finance', 'data-engineer-core') to teams within Atlan to automatically grant the correct permissions. I can't find the settings for this. How is this configured?"
- },
- {
-   "id": "TICKET-257",
-   "subject": "RBAC for assets vs. glossaries",
-   "body": "I need clarification on how Atlan's role-based access control works. If a user is denied access to a specific Snowflake schema, can they still see the glossary terms that are linked to the tables in that schema? I need to ensure our PII governance is airtight."
- },
- {
-   "id": "TICKET-258",
-   "subject": "Process for onboarding asset owners",
-   "body": "We've started identifying owners for our key data assets. What is the recommended workflow in Atlan to assign these owners and automatically notify them? We want to make sure they are aware of their responsibilities without us having to send manual emails for every assignment."
- },
- {
-   "id": "TICKET-259",
-   "subject": "How does Atlan surface sensitive fields like PII?",
-   "body": "Our security team is evaluating Atlan and their main question is around PII and sensitive data. How does Atlan automatically identify fields containing PII? What are our options to apply tags or masks to these fields once they are identified to prevent unauthorized access?"
- },
- {
-   "id": "TICKET-260",
-   "subject": "Authentication methods for APIs and SDKs",
-   "body": "We are planning to build several automations using the Atlan API and Python SDK. What authentication methods are supported? Is it just API keys, or can we use something like OAuth? We have a strict policy that requires key rotation every 90 days, so we need to understand how to manage this programmatically."
- },
- {
-   "id": "TICKET-261",
-   "subject": "Enabling and testing SAML SSO",
-   "body": "We are ready to enable SAML SSO with our Okta instance. However, we are very concerned about disrupting our active users if the configuration is wrong. Is there a way to test the SSO configuration for a specific user or group before we enable it for the entire workspace?"
- },
- {
-   "id": "TICKET-262",
-   "subject": "SSO login not assigning user to correct group",
-   "body": "I've just had a new user, 'test.user@company.com', log in via our newly configured SSO. They were authenticated successfully, but they were not added to the 'Data Analysts' group as expected based on our SAML assertions. This is preventing them from accessing any assets. What could be the reason for this mis-assignment?"
- },
- {
-   "id": "TICKET-263",
-   "subject": "Integration with existing DLP or secrets manager",
-   "body": "Does Atlan have the capability to integrate with third-party tools like a DLP (Data Loss Prevention) solution or a secrets manager like HashiCorp Vault? We need to ensure that connection credentials and sensitive metadata classifications are handled by our central security systems."
- },
- {
-   "id": "TICKET-264",
-   "subject": "Accessing audit logs for compliance reviews",
-   "body": "Our compliance team needs to perform a quarterly review of all activities within Atlan. They need to know who accessed what data, who made permission changes, etc. Where can we find these audit logs, and is there a way to export them or pull them via an API for our records?"
- },
- {
-   "id": "TICKET-265",
-   "subject": "How to programmatically create an asset using the REST API?",
-   "body": "I'm trying to create a new custom asset (a 'Report') using the REST API, but my requests keep failing with a 400 error. The API documentation is a bit sparse on the required payload structure for creating new entities. Could you provide a basic cURL or Python `requests` example of what a successful request body should look like?"
- },
- {
-   "id": "TICKET-266",
-   "subject": "SDK availability and Python example",
-   "body": "I'm a data engineer and prefer using SDKs over raw API calls. Which languages do you provide SDKs for? I'm particularly interested in Python. Where can I find the installation instructions (e.g., PyPI package name) and a short code snippet for a common task, like creating a new glossary term?"
- },
- {
-   "id": "TICKET-267",
-   "subject": "How do webhooks work in Atlan?",
-   "body": "I'm exploring using webhooks to send real-time notifications from Atlan to our internal Slack channel. I need to understand what types of events (e.g., asset updated, term created) can trigger a webhook. Also, how do we validate that the incoming payloads are genuinely from Atlan? Do you support payload signing?"
- },
- {
-   "id": "TICKET-268",
-   "subject": "Triggering an AWS Lambda from Atlan events",
-   "body": "We have a workflow where we want to trigger a custom AWS Lambda function whenever a specific Atlan tag (e.g., 'PII-Confirmed') is added to an asset. What is the recommended and most secure way to set this up? Should we use webhooks pointing to an API Gateway, or is there a more direct integration?"
- },
- {
-   "id": "TICKET-269",
-   "subject": "When to use Atlan automations vs. external services?",
-   "body": "I see that Atlan has a built-in 'Automations' feature. I'm trying to decide if I should use this to manage a workflow or if I should use an external service like Zapier or our own Airflow instance. Could you provide some guidance or examples on what types of workflows are best suited for the native automations versus an external tool?"
- },
- {
-   "id": "TICKET-270",
-   "subject": "Connector failed to crawl - where to check logs?",
-   "body": "URGENT: Our nightly Snowflake crawler failed last night and no new metadata was ingested. This is a critical failure as our morning reports are now missing lineage information. Where can I find the detailed error logs for the crawler run to understand what went wrong? I need to fix this ASAP."
- },
- {
-   "id": "TICKET-271",
-   "subject": "Asset extracted but not published to Atlan",
-   "body": "This is very strange. I'm looking at the crawler logs, and I can see that the asset 'schema.my_table' was successfully extracted from the source. However, when I search for this table in the Atlan UI, it doesn't appear. It seems like it's getting stuck somewhere between extraction and publishing. Can you please investigate the root cause?"
- },
- {
-   "id": "TICKET-272",
-   "subject": "How to measure adoption and generate reports?",
-   "body": "My manager is asking for metrics on our Atlan usage to justify the investment. I need to generate a report showing things like the number of active users, most frequently queried tables, and the number of assets with assigned owners. Does Atlan have a reporting or dashboarding feature for this?"
- },
- {
-   "id": "TICKET-273",
-   "subject": "Best practices for catalog hygiene",
-   "body": "We've been using Atlan for six months, and our catalog is already starting to get a bit messy with duplicate assets and stale metadata from old tests. As we roll this out to more teams, what are some common best practices or features within Atlan that can help us maintain good catalog hygiene and prevent this problem from getting worse?"
- },
- {
-   "id": "TICKET-274",
-   "subject": "How to scale Atlan across multiple business units?",
-   "body": "We are planning a global rollout of Atlan to multiple business units, each with its own data sources and governance teams. We're looking for advice on the best way to structure our Atlan instance. Should we use separate workspaces, or can we achieve isolation using teams and permissions within a single workspace while maintaining a consistent governance model?"
- }
-]
-
+def load_sample_tickets() -> List[Dict[str, Any]]:
+    """Load sample tickets from JSON file or return default data"""
+    try:
+        print("Loading from json file!")
+        json_path = "data/sample_tickets.json"
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
 
 # Enhanced styling and layout
 def apply_custom_styling():
@@ -1426,137 +948,1109 @@ def main():
                     st.warning("Ticket escalated to human agent 👨‍💻")
     
     with tab3:
-        st.markdown('<h2 class="sub-header">📈 Analytics Dashboard</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="sub-header">📈 Advanced Analytics Dashboard</h2>', unsafe_allow_html=True)
         
         if 'classified_tickets' in st.session_state:
             tickets = st.session_state.classified_tickets
             
-            # Analytics overview
+            # Generate analytics
+            trends = analytics_service.generate_topic_trends(tickets)
+            satisfaction = analytics_service.calculate_satisfaction_metrics(tickets)
+            workload = analytics_service.generate_workload_distribution(tickets)
+            performance = analytics_service.generate_performance_metrics(tickets)
+            
+            # Key Metrics Overview
+            st.markdown("### 🎯 Key Performance Indicators")
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{performance['total_processed']}</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Total Tickets</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{satisfaction['nps_score']}%</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">NPS Score</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{performance['auto_resolution_rate_percent']}%</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Auto-Resolution</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{performance['avg_processing_time_seconds']}s</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Avg Process Time</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col5:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{performance['efficiency_score']}</div>
+                    <div style="font-size: 0.9rem; opacity: 0.9;">Efficiency Score</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Advanced Analytics Sections
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("### 📊 Topic Distribution")
-                
-                # Count topics
-                topic_counts = {}
-                for ticket in tickets:
-                    for topic in ticket['classification']['topic_tags']:
-                        topic_counts[topic] = topic_counts.get(topic, 0) + 1
-                
-                # Create a simple bar chart representation
+                # Topic Trends
+                st.markdown("### 📚 Topic Analysis")
                 st.markdown('<div class="analytics-container">', unsafe_allow_html=True)
-                for topic, count in sorted(topic_counts.items(), key=lambda x: x[1], reverse=True):
+                
+                for topic, count in list(trends['topic_frequency'].items())[:7]:
                     percentage = (count / len(tickets)) * 100
                     st.markdown(f"""
-                    <div style="margin: 0.5rem 0;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                            <span style="font-weight: 500;">{topic}</span>
-                            <span style="font-size: 0.9rem; color: #6B7280;">{count} ({percentage:.1f}%)</span>
+                    <div style="margin: 1rem 0; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 500; color: #333;">{topic}</span>
+                            <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.2rem 0.8rem; border-radius: 12px; font-size: 0.8rem;">
+                                {count} tickets
+                            </span>
                         </div>
-                        <div style="background: #E5E7EB; border-radius: 4px; height: 8px;">
-                            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; border-radius: 4px; width: {percentage}%;"></div>
+                        <div style="background: #f0f0f0; border-radius: 8px; height: 8px; overflow: hidden;">
+                            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: {percentage}%; border-radius: 8px; transition: width 0.5s ease;"></div>
                         </div>
+                        <div style="font-size: 0.8rem; color: #666; margin-top: 0.3rem;">{percentage:.1f}% of total volume</div>
                     </div>
                     """, unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
-            
+                
             with col2:
+                # Sentiment Deep Dive
                 st.markdown("### 😊 Sentiment Analysis")
                 
-                # Count sentiments
-                sentiment_counts = {}
-                for ticket in tickets:
-                    sentiment = ticket['classification']['sentiment']
-                    sentiment_counts[sentiment] = sentiment_counts.get(sentiment, 0) + 1
-                
-                # Display sentiment distribution
                 sentiment_colors = {
-                    'Frustrated': '#f5576c',
+                    'Frustrated': '#ff6b6b',
                     'Curious': '#4facfe',
-                    'Angry': '#ff6b6b',
+                    'Angry': '#e55555',
                     'Neutral': '#95a5a6'
                 }
                 
-                for sentiment, count in sentiment_counts.items():
+                for sentiment, count in satisfaction['satisfaction_distribution'].items():
                     percentage = (count / len(tickets)) * 100
                     color = sentiment_colors.get(sentiment, '#95a5a6')
+                    emoji = {'Frustrated': '😤', 'Curious': '🤔', 'Angry': '😠', 'Neutral': '😐'}.get(sentiment, '😐')
                     
                     st.markdown(f"""
-                    <div style="margin: 1rem 0; padding: 1rem; background: white; border-radius: 8px; border-left: 4px solid {color};">
-                        <div style="display: flex; justify-content: between; align-items: center;">
-                            <span style="font-weight: 500; font-size: 1.1rem;">{sentiment}</span>
-                            <span style="margin-left: auto; background: {color}; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.9rem;">
-                                {count} tickets ({percentage:.1f}%)
-                            </span>
+                    <div style="margin: 1rem 0; padding: 1.2rem; background: white; border-radius: 12px; border-left: 5px solid {color}; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center;">
+                                <span style="font-size: 1.5rem; margin-right: 0.5rem;">{emoji}</span>
+                                <span style="font-weight: 600; color: #333;">{sentiment}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.3rem; font-weight: bold; color: {color};">{count}</div>
+                                <div style="font-size: 0.8rem; color: #666;">{percentage:.1f}%</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.8rem; background: #f8f9fa; border-radius: 6px; height: 6px; overflow: hidden;">
+                            <div style="background: {color}; height: 100%; width: {percentage}%; border-radius: 6px;"></div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-            
-            # Priority analysis
-            st.markdown("### ⚡ Priority Distribution")
-            col1, col2, col3 = st.columns(3)
-            
-            priority_counts = {}
-            for ticket in tickets:
-                priority = ticket['classification']['priority']
-                priority_counts[priority] = priority_counts.get(priority, 0) + 1
-            
-            priority_colors = {
-                'P0 (High)': '#ff6b6b',
-                'P1 (Medium)': '#feca57',
-                'P2 (Low)': '#48dbfb'
-            }
-            
-            for i, (priority, count) in enumerate(priority_counts.items()):
-                percentage = (count / len(tickets)) * 100
-                color = priority_colors.get(priority, '#95a5a6')
                 
-                cols = [col1, col2, col3]
-                with cols[i % 3]:
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 2rem; background: {color}; color: white; border-radius: 12px; margin: 0.5rem 0;">
-                        <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 0.5rem;">{count}</div>
-                        <div style="font-size: 1rem; opacity: 0.9;">{priority}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">({percentage:.1f}%)</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # Recent activity timeline
-            st.markdown("### 📅 Recent Activity")
-            st.markdown('<div class="timeline-container">', unsafe_allow_html=True)
-            
-            # Sort tickets by creation time (simulated)
-            sorted_tickets = sorted(tickets, key=lambda x: x.get('created_at', ''), reverse=True)
-            
-            for ticket in sorted_tickets[:5]:  # Show last 5 tickets
-                priority_color = priority_colors.get(ticket['classification']['priority'], '#95a5a6')
+                # Performance Metrics
+                st.markdown("### 🎯 AI Performance")
                 st.markdown(f"""
-                <div style="display: flex; align-items: center; padding: 1rem; margin: 0.5rem 0; background: white; border-radius: 8px; border-left: 4px solid {priority_color};">
-                    <div style="flex: 1;">
-                        <div style="font-weight: 500; margin-bottom: 0.25rem;">{ticket['subject']}</div>
-                        <div style="font-size: 0.9rem; color: #6B7280;">
-                            {ticket['id']} • {ticket.get('created_at', 'N/A')} • 
-                            <span style="background: {priority_color}; color: white; padding: 0.1rem 0.5rem; border-radius: 8px; font-size: 0.8rem;">
-                                {ticket['classification']['priority']}
-                            </span>
+                <div style="padding: 1.5rem; background: linear-gradient(135deg, #d1f2eb 0%, #a3e4d7 100%); border-radius: 12px; margin: 1rem 0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #16a085;">{performance['avg_classification_confidence']:.1%}</div>
+                            <div style="color: #2c3e50; font-size: 0.9rem;">Classification Accuracy</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.8rem; font-weight: bold; color: #16a085;">{performance['efficiency_score']}</div>
+                            <div style="color: #2c3e50; font-size: 0.9rem;">Overall Efficiency</div>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             
-            st.markdown('</div>', unsafe_allow_html=True)
             
+        
         else:
-            st.info("📊 Analytics will appear after tickets are classified. Please visit the 'Bulk Classification' tab first.")
+            st.markdown("""
+            <div style="text-align: center; padding: 4rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; margin: 2rem 0;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+                <h3 style="color: #495057; margin-bottom: 1rem;">Analytics Dashboard</h3>
+                <p style="color: #6c757d; font-size: 1.1rem; max-width: 500px; margin: 0 auto;">
+                    Advanced analytics will appear after tickets are classified. Visit the 'Bulk Classification' tab to get started!
+                </p>
+                <div style="margin-top: 2rem;">
+                    <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.8rem 2rem; border-radius: 25px; font-weight: 500; text-decoration: none; display: inline-block;">
+                        ⚡ Start Classification
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    with tab4:
+        st.markdown('<h2 class="sub-header">🔧 System Monitoring</h2>', unsafe_allow_html=True)
+        
+        # System Health Overview
+        health_status = monitor.get_health_status()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            status_color = {
+                'healthy': '#48dbfb',
+                'warning': '#feca57',
+                'critical': '#ff6b6b'
+            }.get(health_status['status'], '#95a5a6')
+            
+            st.markdown(f"""
+            <div style="text-align: center; padding: 2rem; background: {status_color}; color: white; border-radius: 12px;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">{'🟢' if health_status['status'] == 'healthy' else '🟡' if health_status['status'] == 'warning' else '🔴'}</div>
+                <div style="font-size: 1.2rem; font-weight: bold;">System Status</div>
+                <div style="font-size: 0.9rem; opacity: 0.9;">{health_status['status'].title()}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.metric("Health Score", f"{health_status['health_score']}/100")
+        
+        with col3:
+            st.metric("Uptime", health_status['uptime'])
+        
+        with col4:
+            st.metric("Active Issues", len(health_status['issues']))
+        
+        # System Metrics
+        system_metrics = monitor.get_system_metrics()
+        app_metrics = monitor.get_application_metrics()
+        
+        if 'error' not in system_metrics:
+            st.markdown("### 📊 Real-time Metrics")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### System Resources")
+                
+                # CPU Usage
+                cpu_color = '#ff6b6b' if system_metrics['cpu_percent'] > 80 else '#feca57' if system_metrics['cpu_percent'] > 60 else '#48dbfb'
+                st.markdown(f"""
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>CPU Usage</span>
+                        <span>{system_metrics['cpu_percent']:.1f}%</span>
+                    </div>
+                    <div style="background: #e0e0e0; border-radius: 10px; height: 10px;">
+                        <div style="background: {cpu_color}; width: {system_metrics['cpu_percent']}%; height: 100%; border-radius: 10px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Memory Usage
+                mem_color = '#ff6b6b' if system_metrics['memory_percent'] > 80 else '#feca57' if system_metrics['memory_percent'] > 60 else '#48dbfb'
+                st.markdown(f"""
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Memory Usage</span>
+                        <span>{system_metrics['memory_percent']:.1f}%</span>
+                    </div>
+                    <div style="background: #e0e0e0; border-radius: 10px; height: 10px;">
+                        <div style="background: {mem_color}; width: {system_metrics['memory_percent']}%; height: 100%; border-radius: 10px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.metric("Available Memory", f"{system_metrics['memory_available_gb']} GB")
+                st.metric("Disk Usage", f"{system_metrics['disk_usage_percent']:.1f}%")
+            
+            with col2:
+                st.markdown("#### Application Performance")
+                st.metric("Total Requests", app_metrics['total_requests'])
+                st.metric("Avg Response Time", f"{app_metrics['avg_response_time']}s")
+                st.metric("Error Rate", f"{app_metrics['error_rate']}%")
+                st.metric("Cache Hit Rate", f"{app_metrics['cache_hit_rate']*100:.1f}%")
+        
+        # Recent Alerts
+        recent_alerts = monitor.get_recent_alerts(5)
+        if recent_alerts:
+            st.markdown("### 🚨 Recent Alerts")
+            for alert in recent_alerts:
+                alert_color = {
+                    'critical': '#ff6b6b',
+                    'warning': '#feca57',
+                    'info': '#48dbfb'
+                }.get(alert['type'], '#95a5a6')
+                
+                st.markdown(f"""
+                <div style="padding: 1rem; margin: 0.5rem 0; background: {alert_color}20; border-left: 4px solid {alert_color}; border-radius: 8px;">
+                    <div style="font-weight: bold; color: {alert_color};">{alert['title']}</div>
+                    <div style="color: #666; margin-top: 0.25rem;">{alert['message']}</div>
+                    <div style="font-size: 0.8rem; color: #999; margin-top: 0.5rem;">{alert['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Performance Report
+        with st.expander("📈 Performance Report", expanded=False):
+            performance_report = monitor.generate_performance_report()
+            if 'message' not in performance_report:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("Total Requests", performance_report['total_requests'])
+                    st.metric("Success Rate", f"{performance_report['success_rate']}%")
+                    st.metric("Avg Response Time", f"{performance_report['avg_response_time']}s")
+                
+                with col2:
+                    st.metric("Min Response Time", f"{performance_report['min_response_time']}s")
+                    st.metric("Max Response Time", f"{performance_report['max_response_time']}s")
+                
+                if performance_report['endpoint_statistics']:
+                    st.markdown("#### Endpoint Statistics")
+                    for endpoint, stats in performance_report['endpoint_statistics'].items():
+                        st.markdown(f"**{endpoint}**: {stats['request_count']} requests, {stats['avg_response_time']}s avg, {stats['error_rate']}% error rate")
+            else:
+                st.info(performance_report['message'])
+        
+        # Clear alerts button
+        if st.button("🗑️ Clear All Alerts"):
+            monitor.clear_alerts()
+            st.success("All alerts cleared!")
+            st.rerun()
     
     # Footer
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; padding: 2rem; color: #6B7280;">
-        <p>🎯 <strong>Atlan Helpdesk AI Assistant</strong> - Powered by Advanced Language Models</p>
-        <p style="font-size: 0.9rem;">Built with ❤️ using Streamlit, LangChain, and Groq</p>
+    <div style="text-align: center; color: #666; margin-top: 2rem;">
+        <p>🎯 <strong>Atlan AI Helpdesk System</strong> - Powered by Enhanced RAG & LangChain Agents</p>
+        <p><em>Real-time verbose processing • Intelligent classification • Source-cited responses</em></p>
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
+
+# #improve below abhi
+
+
+
+
+# import streamlit as st
+# import json
+# import os
+# from datetime import datetime
+# from typing import Dict, List, Any
+# import time
+# import traceback
+# import plotly.express as px
+# import plotly.graph_objects as go
+# import pandas as pd
+# import numpy as np
+
+# # Import our custom modules
+# from services.knowledge_base import EnhancedAtlanKnowledgeBase
+# from services.ticket_classifier import TicketClassifier, AtlanRAGAgent
+
+# # Set page config
+# st.set_page_config(
+#     page_title="Atlan AI Helpdesk System",
+#     page_icon="🎯",
+#     layout="wide",
+#     initial_sidebar_state="expanded"
+# )
+
+# # Enhanced CSS styling
+# st.markdown("""
+# <style>
+#     :root {
+#         --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+#         --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+#         --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+#         --warning-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+#         --info-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+#         --dark-bg: #1a1a2e;
+#         --card-bg: #ffffff;
+#         --text-dark: #2d3436;
+#         --text-light: #636e72;
+#         --shadow: 0 10px 30px rgba(0,0,0,0.1);
+#         --radius: 16px;
+#     }
+    
+#     .stApp {
+#         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+#     }
+    
+#     .main > div {
+#         background: var(--card-bg);
+#         border-radius: var(--radius);
+#         margin: 1rem;
+#         padding: 2rem;
+#         box-shadow: var(--shadow);
+#     }
+    
+#     .main-header {
+#         background: var(--primary-gradient);
+#         padding: 2.5rem;
+#         border-radius: var(--radius);
+#         color: white;
+#         text-align: center;
+#         margin-bottom: 2rem;
+#         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+#         position: relative;
+#         overflow: hidden;
+#     }
+    
+#     .main-header::before {
+#         content: '';
+#         position: absolute;
+#         top: -50%;
+#         left: -50%;
+#         width: 200%;
+#         height: 200%;
+#         background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+#         transform: rotate(30deg);
+#     }
+    
+#     .main-header h1 {
+#         margin: 0 0 0.5rem 0;
+#         font-size: 2.8rem;
+#         font-weight: 800;
+#         position: relative;
+#         z-index: 2;
+#     }
+    
+#     .main-header p {
+#         font-size: 1.2rem;
+#         opacity: 0.9;
+#         position: relative;
+#         z-index: 2;
+#     }
+    
+#     .ticket-card {
+#         background: linear-gradient(145deg, #f8f9ff, #f1f3ff);
+#         padding: 1.8rem;
+#         border-radius: 12px;
+#         border-left: 5px solid #667eea;
+#         margin-bottom: 1.2rem;
+#         transition: all 0.3s ease;
+#         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+#     }
+    
+#     .ticket-card:hover {
+#         transform: translateY(-5px);
+#         box-shadow: 0 15px 35px rgba(102, 126, 234, 0.2);
+#     }
+    
+#     .classification-row {
+#         display: flex;
+#         flex-wrap: wrap;
+#         gap: 0.75rem;
+#         margin: 1rem 0;
+#     }
+    
+#     .classification-tag {
+#         padding: 0.6rem 1.2rem;
+#         border-radius: 25px;
+#         font-size: 0.85rem;
+#         font-weight: 600;
+#         text-transform: uppercase;
+#         letter-spacing: 0.5px;
+#         color: white;
+#         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+#     }
+    
+#     .tag-topic { background: var(--primary-gradient); }
+#     .tag-frustrated { background: var(--secondary-gradient); }
+#     .tag-angry { background: linear-gradient(135deg, #ff8a80, #ff5722); }
+#     .tag-curious { background: var(--success-gradient); }
+#     .tag-neutral { background: linear-gradient(135deg, #9c27b0, #673ab7); }
+#     .tag-satisfied { background: linear-gradient(135deg, #66bb6a, #43a047); }
+#     .tag-high { background: linear-gradient(135deg, #f44336, #d32f2f); }
+#     .tag-medium { background: linear-gradient(135deg, #ff9800, #f57c00); }
+#     .tag-low { background: linear-gradient(135deg, #4caf50, #388e3c); }
+    
+#     .response-section {
+#         background: linear-gradient(145deg, #e8f5e8, #f1f8e9);
+#         padding: 1.8rem;
+#         border-radius: 12px;
+#         border: 2px solid #4caf50;
+#         margin: 1.2rem 0;
+#         box-shadow: 0 4px 15px rgba(76, 175, 80, 0.1);
+#     }
+    
+#     .analysis-section {
+#         background: linear-gradient(145deg, #e3f2fd, #f3f9ff);
+#         padding: 1.8rem;
+#         border-radius: 12px;
+#         border: 2px solid #2196f3;
+#         margin: 1.2rem 0;
+#         box-shadow: 0 4px 15px rgba(33, 150, 243, 0.1);
+#     }
+    
+#     .confidence-indicator {
+#         display: inline-flex;
+#         align-items: center;
+#         padding: 0.6rem 1.2rem;
+#         border-radius: 25px;
+#         font-weight: 600;
+#         margin-left: 1rem;
+#         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+#     }
+    
+#     .confidence-high { background: #d4edda; color: #155724; }
+#     .confidence-medium { background: #fff3cd; color: #856404; }
+#     .confidence-low { background: #f8d7da; color: #721c24; }
+    
+#     .metric-card {
+#         background: white;
+#         padding: 1.8rem;
+#         border-radius: var(--radius);
+#         text-align: center;
+#         box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+#         border-top: 5px solid #667eea;
+#         transition: all 0.3s ease;
+#         height: 100%;
+#     }
+    
+#     .metric-card:hover {
+#         transform: translateY(-5px);
+#         box-shadow: 0 15px 30px rgba(0,0,0,0.12);
+#     }
+    
+#     .metric-value {
+#         font-size: 2.5rem;
+#         font-weight: 800;
+#         color: #667eea;
+#         margin: 0;
+#         text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+#     }
+    
+#     .metric-label {
+#         font-size: 0.95rem;
+#         color: var(--text-light);
+#         margin-top: 0.5rem;
+#         font-weight: 500;
+#     }
+    
+#     .source-card {
+#         background: linear-gradient(145deg, #fff8f0, #fff4e6);
+#         padding: 1.2rem;
+#         border-radius: 10px;
+#         border-left: 4px solid #ff9800;
+#         margin: 0.8rem 0;
+#         box-shadow: 0 4px 10px rgba(255, 152, 0, 0.1);
+#         transition: all 0.3s ease;
+#     }
+    
+#     .source-card:hover {
+#         transform: translateX(5px);
+#         box-shadow: 0 8px 20px rgba(255, 152, 0, 0.15);
+#     }
+    
+#     .status-indicator {
+#         display: inline-flex;
+#         align-items: center;
+#         padding: 0.4rem 1rem;
+#         border-radius: 20px;
+#         font-size: 0.85rem;
+#         font-weight: 600;
+#         margin: 0.3rem 0;
+#         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+#     }
+    
+#     .status-ready { background: #d4edda; color: #155724; }
+#     .status-error { background: #f8d7da; color: #721c24; }
+#     .status-warning { background: #fff3cd; color: #856404; }
+    
+#     .analytics-container {
+#         background: white;
+#         border-radius: var(--radius);
+#         padding: 1.5rem;
+#         margin: 1rem 0;
+#         box-shadow: var(--shadow);
+#     }
+    
+#     .sub-header {
+#         font-size: 1.8rem;
+#         font-weight: 700;
+#         color: var(--text-dark);
+#         margin-bottom: 1.5rem;
+#         padding-bottom: 0.5rem;
+#         border-bottom: 3px solid #667eea;
+#         display: inline-block;
+#     }
+    
+#     .chart-container {
+#         background: white;
+#         border-radius: var(--radius);
+#         padding: 1.5rem;
+#         margin: 1rem 0;
+#         box-shadow: var(--shadow);
+#     }
+    
+#     .empty-state {
+#         text-align: center;
+#         padding: 4rem;
+#         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+#         border-radius: var(--radius);
+#         margin: 2rem 0;
+#         box-shadow: var(--shadow);
+#     }
+    
+#     .empty-state-icon {
+#         font-size: 5rem;
+#         margin-bottom: 1.5rem;
+#         opacity: 0.7;
+#     }
+    
+#     .cta-button {
+#         background: var(--primary-gradient);
+#         color: white;
+#         padding: 1rem 2.5rem;
+#         border-radius: 30px;
+#         font-weight: 600;
+#         text-decoration: none;
+#         display: inline-block;
+#         margin-top: 1.5rem;
+#         box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+#         transition: all 0.3s ease;
+#         border: none;
+#         cursor: pointer;
+#     }
+    
+#     .cta-button:hover {
+#         transform: translateY(-3px);
+#         box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+#         color: white;
+#     }
+    
+#     .progress-bar {
+#         height: 10px;
+#         border-radius: 5px;
+#         background: #f0f0f0;
+#         overflow: hidden;
+#         margin: 0.5rem 0;
+#     }
+    
+#     .progress-fill {
+#         height: 100%;
+#         border-radius: 5px;
+#         transition: width 0.5s ease;
+#     }
+    
+#     .sentiment-card {
+#         padding: 1.5rem;
+#         border-radius: 12px;
+#         margin: 1rem 0;
+#         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+#         border-left: 5px solid;
+#         transition: all 0.3s ease;
+#     }
+    
+#     .sentiment-card:hover {
+#         transform: translateY(-3px);
+#         box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+#     }
+# </style>
+# """, unsafe_allow_html=True)
+
+# # Analytics service (mock implementation)
+# class AnalyticsService:
+#     def generate_topic_trends(self, tickets):
+#         topics = {}
+#         for ticket in tickets:
+#             topic = ticket['classification']['topic']
+#             topics[topic] = topics.get(topic, 0) + 1
+        
+#         return {
+#             'topic_frequency': dict(sorted(topics.items(), key=lambda x: x[1], reverse=True)),
+#             'total_tickets': len(tickets)
+#         }
+    
+#     def calculate_satisfaction_metrics(self, tickets):
+#         sentiments = {}
+#         for ticket in tickets:
+#             sentiment = ticket['classification']['sentiment']
+#             sentiments[sentiment] = sentiments.get(sentiment, 0) + 1
+        
+#         nps_score = 75  # Mock NPS calculation
+#         return {
+#             'satisfaction_distribution': sentiments,
+#             'nps_score': nps_score
+#         }
+    
+#     def generate_workload_distribution(self, tickets):
+#         # Mock workload distribution
+#         return {
+#             'by_priority': {'High': 25, 'Medium': 50, 'Low': 25},
+#             'by_complexity': {'Simple': 40, 'Moderate': 45, 'Complex': 15}
+#         }
+    
+#     def generate_performance_metrics(self, tickets):
+#         # Mock performance metrics
+#         return {
+#             'total_processed': len(tickets),
+#             'auto_resolution_rate_percent': 65,
+#             'avg_processing_time_seconds': 124,
+#             'avg_classification_confidence': 0.87,
+#             'efficiency_score': 8.7
+#         }
+
+# analytics_service = AnalyticsService()
+
+# def load_sample_tickets() -> List[Dict[str, Any]]:
+#     """Load sample tickets from JSON file or return default data"""
+#     try:
+#         json_path = "data/sample_tickets.json"
+#         if os.path.exists(json_path):
+#             with open(json_path, 'r') as f:
+#                 return json.load(f)
+#     except Exception:
+#         pass
+
+#     return [
+#         {
+#             "id": "TICKET-245",
+#             "subject": "Connecting Snowflake to Atlan - required permissions?",
+#             "body": "Hi team, we're trying to set up our primary Snowflake production database as a new source in Atlan, but the connection keeps failing. We've tried using our standard service account, but it's not working. Our entire BI team is blocked on this integration for a major upcoming project, so it's quite urgent. Could you please provide a definitive list of the exact permissions and credentials needed on the Snowflake side to get this working? Thanks."
+#         },
+#         {
+#             "id": "TICKET-246", 
+#             "subject": "Data lineage not showing downstream impacts",
+#             "body": "Our data lineage view isn't capturing all the downstream transformations in our dbt models. We have a complex data pipeline and need to understand the full impact of changes. Can you help us troubleshoot why some lineage connections are missing?"
+#         },
+#         {
+#             "id": "TICKET-247",
+#             "subject": "API authentication failing with 401 errors", 
+#             "body": "I'm trying to use the Atlan Python SDK to automate some metadata updates, but I keep getting 401 authentication errors. I've double-checked my API token. What could be wrong?"
+#         },
+#         {
+#             "id": "TICKET-248",
+#             "subject": "How to implement SSO with Okta?",
+#             "body": "We need to set up Single Sign-On integration with our Okta identity provider. What are the configuration steps and requirements for SAML SSO setup in Atlan?"
+#         },
+#         {
+#             "id": "TICKET-249",
+#             "subject": "Best practices for data governance policies",
+#             "body": "We're looking for recommendations on how to structure our data governance framework in Atlan. What are the best practices for setting up policies, classifications, and ownership?"
+#         }
+#     ]
+
+# def initialize_session_state():
+#     """Initialize all session state variables"""
+    
+#     if 'sample_tickets' not in st.session_state:
+#         st.session_state.sample_tickets = load_sample_tickets()
+    
+#     if 'knowledge_base' not in st.session_state:
+#         st.session_state.knowledge_base = None
+#         st.session_state.kb_status = "initializing"
+        
+#         with st.spinner("Initializing Atlan Knowledge Base..."):
+#             try:
+#                 st.session_state.knowledge_base = EnhancedAtlanKnowledgeBase()
+#                 st.session_state.kb_status = "ready"
+#                 st.success("Knowledge Base initialized successfully!")
+#             except Exception as e:
+#                 st.error(f"Failed to initialize Knowledge Base: {str(e)}")
+#                 st.session_state.kb_status = "error"
+#                 if "429" in str(e):
+#                     st.info("Rate limit detected. Please wait and refresh the page.")
+    
+#     if 'classifier' not in st.session_state:
+#         if st.session_state.knowledge_base and st.session_state.kb_status == "ready":
+#             try:
+#                 st.session_state.classifier = TicketClassifier()
+#                 st.session_state.classifier_status = "ready"
+#             except Exception as e:
+#                 st.session_state.classifier_status = "error"
+#                 st.session_state.classifier = None
+#         else:
+#             st.session_state.classifier_status = "waiting"
+#             st.session_state.classifier = None
+    
+#     if 'rag_agent' not in st.session_state:
+#         if st.session_state.knowledge_base and st.session_state.kb_status == "ready":
+#             try:
+#                 st.session_state.rag_agent = AtlanRAGAgent(st.session_state.knowledge_base)
+#                 st.session_state.agent_status = "ready"
+#             except Exception as e:
+#                 st.session_state.agent_status = "error"
+#                 st.session_state.rag_agent = None
+#         else:
+#             st.session_state.agent_status = "waiting"
+#             st.session_state.rag_agent = None
+
+# def render_header():
+#     """Render the main header"""
+#     st.markdown("""
+#     <div class="main-header">
+#         <h1>Atlan AI Helpdesk System</h1>
+#         <p>Intelligent ticket classification with RAG-powered responses</p>
+#     </div>
+#     """, unsafe_allow_html=True)
+
+# def get_confidence_class(confidence: float) -> str:
+#     """Get CSS class for confidence level"""
+#     if confidence >= 0.8:
+#         return "confidence-high"
+#     elif confidence >= 0.5:
+#         return "confidence-medium"
+#     else:
+#         return "confidence-low"
+
+# def render_classification_tags(classification: Dict[str, Any]) -> str:
+#     """Render classification tags with proper styling"""
+#     topic = classification.get('topic', 'unknown')
+#     sentiment = classification.get('sentiment', 'neutral').lower()
+#     priority = classification.get('priority', 'medium').lower().replace(' ', '').replace('(', '').replace(')', '')
+    
+#     return f"""
+#     <div class="classification-row">
+#         <span class="classification-tag tag-topic">{topic}</span>
+#         <span class="classification-tag tag-{sentiment}">{classification.get('sentiment', 'Neutral')}</span>
+#         <span class="classification-tag tag-{priority}">{classification.get('priority', 'Medium')}</span>
+#     </div>
+#     """
+
+# def render_bulk_classification():
+#     """Render bulk ticket classification dashboard"""
+#     st.header("Bulk Ticket Classification Dashboard")
+    
+#     if not st.session_state.classifier or st.session_state.classifier_status != "ready":
+#         st.error("Classifier not available - please check system status")
+#         return
+    
+#     col1, col2 = st.columns([3, 1])
+    
+#     with col1:
+#         if st.button("Classify All Tickets", type="primary", use_container_width=True):
+#             classify_all_tickets()
+    
+#     with col2:
+#         if st.button("Clear Results", use_container_width=True):
+#             if 'classified_tickets' in st.session_state:
+#                 del st.session_state.classified_tickets
+#             st.rerun()
+    
+#     if hasattr(st.session_state, 'classified_tickets'):
+#         st.subheader(f"Classification Results ({len(st.session_state.classified_tickets)} tickets)")
+        
+#         for ticket in st.session_state.classified_tickets:
+#             st.markdown(f"""
+#             <div class="ticket-card">
+#                 <h4>{ticket['id']}: {ticket['subject']}</h4>
+#                 <p><strong>Description:</strong> {ticket['body'][:200]}{'...' if len(ticket['body']) > 200 else ''}</p>
+#                 {render_classification_tags(ticket['classification'])}
+#                 <p><em><strong>Reasoning:</strong> {ticket['classification']['reasoning']}</em></p>
+#                 <small>Classified at: {ticket['classified_at']}</small>
+#             </div>
+#             """, unsafe_allow_html=True)
+
+# def classify_all_tickets():
+#     """Classify all tickets with rate limiting"""
+#     st.session_state.classified_tickets = []
+#     progress_bar = st.progress(0)
+#     status_text = st.empty()
+    
+#     for i, ticket in enumerate(st.session_state.sample_tickets):
+#         status_text.text(f'Classifying ticket {i+1}/{len(st.session_state.sample_tickets)}: {ticket["subject"]}')
+        
+#         try:
+#             if i > 0:
+#                 time.sleep(2)
+                
+#             ticket_text = f"Subject: {ticket['subject']}\nBody: {ticket['body']}"
+#             classification = st.session_state.classifier.classify_ticket(ticket_text)
+            
+#             classified_ticket = {
+#                 **ticket,
+#                 "classification": classification,
+#                 "classified_at": datetime.now().isoformat()
+#             }
+#             st.session_state.classified_tickets.append(classified_ticket)
+            
+#         except Exception as e:
+#             st.error(f"Error classifying ticket {ticket['id']}: {str(e)}")
+#             if "429" in str(e):
+#                 st.warning("Rate limit hit - please wait before retrying")
+#                 break
+        
+#         progress_bar.progress((i + 1) / len(st.session_state.sample_tickets))
+    
+#     status_text.text('Classification completed!')
+#     time.sleep(1)
+#     status_text.empty()
+#     progress_bar.empty()
+
+# def render_interactive_agent():
+#     """Render interactive AI agent interface"""
+#     st.header("Interactive AI Agent with RAG System")
+    
+#     if not all([
+#         st.session_state.classifier and st.session_state.classifier_status == "ready",
+#         st.session_state.rag_agent and st.session_state.agent_status == "ready",
+#         st.session_state.knowledge_base and st.session_state.kb_status == "ready"
+#     ]):
+#         st.error("AI Agent not available - System initialization incomplete")
+#         return
+    
+#     with st.form("query_form", clear_on_submit=False):
+#         user_query = st.text_area(
+#             "Submit your question or support ticket:",
+#             placeholder="e.g., How do I set up SSO with Okta in Atlan?\ne.g., What permissions are needed for Snowflake connector?",
+#             height=120
+#         )
+        
+#         col1, col2 = st.columns([3, 1])
+#         with col1:
+#             submit_button = st.form_submit_button("Process Query", type="primary", use_container_width=True)
+#         with col2:
+#             clear_button = st.form_submit_button("Clear", use_container_width=True)
+    
+#     if submit_button and user_query.strip():
+#         st.markdown("---")
+        
+#         # Step 1: Classification
+#         st.markdown("### Analysis")
+#         with st.spinner("Analyzing query..."):
+#             try:
+#                 classification = st.session_state.classifier.classify_ticket(user_query)
+                
+#                 st.markdown(f"""
+#                 <div class="analysis-section">
+#                     <h4>Classification Results:</h4>
+#                     {render_classification_tags(classification)}
+#                     <p><strong>AI Reasoning:</strong> {classification['reasoning']}</p>
+#                 </div>
+#                 """, unsafe_allow_html=True)
+                
+#             except Exception as e:
+#                 st.error(f"Classification error: {str(e)}")
+#                 return
+        
+#         # Step 2: Generate RAG response using existing knowledge base method
+#         st.markdown("### AI Response")
+        
+#         with st.spinner("Generating intelligent response using RAG system..."):
+#             try:
+#                 # Use existing generate_rag_response method from knowledge base
+#                 rag_response = st.session_state.knowledge_base.generate_rag_response(
+#                     user_query,
+#                     limit=3
+#                 )
+                
+#                 # Get confidence from the response
+#                 confidence = rag_response.get('confidence', 0.0)
+#                 confidence_class = get_confidence_class(confidence)
+                
+#                 # Generate agent response with RAG context
+#                 response_data = st.session_state.rag_agent.generate_response(
+#                     user_query, 
+#                     classification
+#                 )
+                
+#                 # Display response with confidence
+#                 st.markdown(f"""
+#                 <div class="response-section">
+#                     <h4>Generated Response
+#                         <span class="confidence-indicator {confidence_class}">
+#                             Confidence: {confidence:.1%}
+#                         </span>
+#                     </h4>
+#                     <div style="white-space: pre-wrap;">{rag_response.get('answer', 'No response generated')}</div>
+#                 </div>
+#                 """, unsafe_allow_html=True)
+                
+#                 # Display sources if available
+#                 if rag_response.get('sources'):
+#                     st.markdown("### Sources")
+#                     for i, source in enumerate(rag_response['sources'], 1):
+#                         st.markdown(f"""
+#                         <div class="source-card">
+#                             <strong>{i}. {source['title']}</strong><br>
+#                             <a href="{source['url']}" target="_blank">{source['url']}</a><br>
+#                             <small>Category: {source['category']} / {source['subcategory']} | Tags: {', '.join(source['tags'])}</small>
+#                         </div>
+#                         """, unsafe_allow_html=True)
+                
+#             except Exception as e:
+#                 st.error(f"Error generating response: {str(e)}")
+#                 if "429" in str(e):
+#                     st.info("Rate limit detected. Please wait before trying again.")
+
+# import streamlit as st
+
+# def render_knowledge_base_info():
+#     """Render knowledge base information and testing interface"""
+#     st.header("📚 Knowledge Base Information & Testing")
+
+#     if not st.session_state.knowledge_base or st.session_state.kb_status != "ready":
+#         st.error("Knowledge Base not available")
+#         return
+
+#     # Stats section
+#     with st.spinner("Loading knowledge base statistics..."):
+#         try:
+#             stats = st.session_state.knowledge_base.get_knowledge_base_stats()
+
+#             if "error" not in stats:
+#                 st.markdown("### 📊 Knowledge Base Stats")
+
+#                 col1, col2 = st.columns(2)
+
+
+#                 with col1:
+#                     st.markdown(f"""
+#                     <div class="metric-card">
+#                         <div class="metric-value">{len(stats['source_types'])}</div>
+#                         <p class="metric-label">Source Types</p>
+#                     </div>
+#                     """, unsafe_allow_html=True)
+
+#                 with col2:
+#                     st.markdown(f"""
+#                     <div class="metric-card success">
+#                         <div class="metric-value">✓</div>
+#                         <p class="metric-label">Status</p>
+#                     </div>
+#                     """, unsafe_allow_html=True)
+
+#                 # Breakdown of source types
+#                 st.markdown("#### 🔎 Source Type Breakdown")
+#                 for source_type, count in stats['source_types'].items():
+#                     st.write(f"- **{source_type}**: {count:,} chunks")
+
+#             else:
+#                 st.error(f"Error loading stats: {stats['error']}")
+
+#         except Exception as e:
+#             st.error(f"Error displaying knowledge base info: {str(e)}")
+
+#     st.markdown("---")
+
+#     # Testing interface
+#     st.subheader("🧪 Test Knowledge Base Search")
+
+#     col1, col2 = st.columns([3, 1])
+
+#     with col1:
+#         test_query = st.text_input(
+#             "Enter a test query:",
+#             placeholder="e.g., How to authenticate with Atlan API?"
+#         )
+
+#     with col2:
+#         category_filter = st.selectbox(
+#             "Category Filter:",
+#             ["None", "product_documentation", "developer_hub"],
+#             index=0
+#         )
+
+#     if st.button("🔍 Search Knowledge Base", type="primary", use_container_width=True) and test_query:
+#         with st.spinner("Searching knowledge base..."):
+#             try:
+#                 filter_category = None if category_filter == "None" else category_filter
+
+#                 results = st.session_state.knowledge_base.search_knowledge_base(
+#                     test_query,
+#                     limit=5,
+#                     category_filter=filter_category
+#                 )
+
+#                 if results:
+#                     st.success(f"Found {len(results)} results")
+
+#                     for i, result in enumerate(results, 1):
+#                         with st.expander(f"Result {i} • Similarity Score: {result.score:.3f}"):
+#                             payload = result.payload
+
+#                             st.markdown(f"""
+#                             **📌 Title:** {payload['title']}  
+#                             **🔗 URL:** [{payload['url']}]({payload['url']})  
+#                             **📂 Category:** {payload['main_category']} / {payload['subcategory']}  
+#                             **🏷️ Tags:** {', '.join(payload['tags'])}  
+#                             """)
+#                             st.metric("Confidence", f"{result.score:.1%}")
+#                             st.write(f"**Chunk:** {payload['chunk_index']}/{payload['total_chunks']}")
+
+#                             st.markdown("**📝 Content Preview:**")
+#                             st.info(payload['content'][:500] + "..." if len(payload['content']) > 500 else payload['content'])
+
+#             except Exception as e:
+#                 st.error(f"Search error: {str(e)}")
+
+# def render_system_status():
+#     """Render system status in sidebar"""
+#     st.sidebar.markdown("### System Status")
+    
+#     # Knowledge Base status
+#     if st.session_state.kb_status == "ready":
+#         st.sidebar.markdown('<div class="status-indicator status-ready">Knowledge Base: Ready</div>', unsafe_allow_html=True)
+#     elif st.session_state.kb_status == "error":
+#         st.sidebar.markdown('<div class="status-indicator status-error">Knowledge Base: Error</div>', unsafe_allow_html=True)
+#     else:
+#         st.sidebar.markdown('<div class="status-indicator status-warning">Knowledge Base: Initializing</div>', unsafe_allow_html=True)
+    
+#     # Classifier status
+#     classifier_status = getattr(st.session_state, 'classifier_status', 'waiting')
+#     if classifier_status == "ready":
+#         st.sidebar.markdown('<div class="status-indicator status-ready">Classifier: Ready</div>', unsafe_allow_html=True)
+#     elif classifier_status == "error":
+#         st.sidebar.markdown('<div class="status-indicator status-error">Classifier: Error</div>', unsafe_allow_html=True)
+#     else:
+#         st.sidebar.markdown('<div class="status-indicator status-warning">Classifier: Waiting</div>', unsafe_allow_html=True)
+    
+#     # RAG Agent status
+#     agent_status = getattr(st.session_state, 'agent_status', 'waiting')
+#     if agent_status == "ready":
+#         st.sidebar.markdown('<div class="status-indicator status-ready">RAG Agent: Ready</div>', unsafe_allow_html=True)
+#     elif agent_status == "error":
+#         st.sidebar.markdown('<div class="status-indicator status-error">RAG Agent: Error</div>', unsafe_allow_html=True)
+#     else:
+#         st.sidebar.markdown('<div class="status-indicator status-warning">RAG Agent: Waiting</div>', unsafe_allow_html=True)
+
+# def main():
+#     """Main Streamlit application"""
+#     initialize_session_state()
+#     render_header()
+    
+#     # Sidebar navigation
+#     with st.sidebar:
+#         st.title("Navigation")
+        
+#         page = st.radio(
+#             "Select View:",
+#             [
+#                 "Bulk Classification", 
+#                 "Interactive Agent", 
+#                 "Knowledge Base Info",
+#                 "Analytics Dashboard"
+#             ],
+#             index=3
+#         )
+        
+#         st.markdown("---")
+#         render_system_status()
+    
+#     # Main content based on page selection
+#     if page == "Bulk Classification":
+#         render_bulk_classification()
+#     elif page == "Interactive Agent":
+#         render_interactive_agent()
+#     elif page == "Knowledge Base Info":
+#         render_knowledge_base_info()
+#     # else:
+#     #     render_analytics_dashboard()
+
+# if __name__ == "__main__":
+#     main()

@@ -1,7 +1,6 @@
 import logging
 from typing import List, Dict, Optional, Any
 from sentence_transformers import SentenceTransformer
-
 from models.ticket_models import RAGResponse, TicketClassification, Document
 
 logger = logging.getLogger(__name__)

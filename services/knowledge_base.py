@@ -660,6 +660,7 @@ import re
 from urllib.parse import urlparse
 from typing import List, Dict, Any, Optional
 import json
+from config.settings import Settings as settings
 
 class EnhancedAtlanKnowledgeBase:
     def __init__(self):
@@ -683,9 +684,9 @@ class EnhancedAtlanKnowledgeBase:
 
         # ---- Scrapers ----
         print("🌐 Initializing scrapers...")
-        self.firecrawl = Firecrawl(api_key="fc-0f0bca73568742ed9c8a11e488ce3b07")
+        self.firecrawl = Firecrawl(api_key=settings.FIRECRAWL_API_KEY)
         self.jina_headers = {
-            "Authorization": "Bearer jina_55344b955b224c19bcb21c73260811c1_Xp6JVTtQb7QDe8CLhVlXSnFHBMQ"
+            "Authorization": f"Bearer {settings.JINA_API_KEY}"
         }
         print("✅ Firecrawl and Jina AI scrapers initialized")
 
@@ -693,8 +694,8 @@ class EnhancedAtlanKnowledgeBase:
         print("\n🔌 Connecting to Qdrant database...")
         try:
             self.qdrant = QdrantClient(
-                url="https://2926feae-a2ea-4ce3-bafb-b4a47075e39a.eu-central-1-0.aws.cloud.qdrant.io:6333",
-                api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.ySsf9zVCNaQqrirLbX-pc8oBJUDbOmzU5xfdLNHgR8Q",
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY,
                 timeout=30.0
             )
             print("✅ Connected to Qdrant")
@@ -1255,6 +1256,9 @@ The information above comes from {len(sources)} different sources in the Atlan d
         try:
             collection_info = self.qdrant.get_collection(self.collection_name)
             
+            # Handle None values
+            vectors_count = collection_info.vectors_count or 0
+            
             # Get category distribution
             category_scroll = self.qdrant.scroll(
                 collection_name=self.collection_name,
@@ -1276,7 +1280,7 @@ The information above comes from {len(sources)} different sources in the Atlan d
                 source_types[source_type] = source_types.get(source_type, 0) + 1
             
             return {
-                "total_vectors": collection_info.vectors_count,
+                "total_vectors": vectors_count,
                 "collection_status": collection_info.status,
                 "categories": categories,
                 "subcategories": subcategories,
@@ -1286,7 +1290,6 @@ The information above comes from {len(sources)} different sources in the Atlan d
             
         except Exception as e:
             return {"error": str(e)}
-
 # Example usage and testing
 if __name__ == "__main__":
     try:
