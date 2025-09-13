@@ -54,6 +54,7 @@ User Input → Classification → Knowledge Retrieval → Response Generation �
 - **Advanced Filtering**: Complex metadata filtering capabilities
 - **Python Integration**: Native Python client with async support
 - **Memory Efficiency**: Optimized storage and retrieval mechanisms
+<img width="1451" height="75" alt="image" src="https://github.com/user-attachments/assets/8b81d946-8d7b-43f3-9d38-c773e0beb9a6" />
 
 **Architecture Benefits:**
 ```python
@@ -241,6 +242,7 @@ atlan-helpdesk-ai/
 │   └── initialize_kb.py
 └── requirements.txt
 ```
+
 
 
 
