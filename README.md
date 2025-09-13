@@ -4,67 +4,7 @@ An intelligent customer support system that automatically classifies tickets and
 
 ## 🏗️ Architecture Overview
 
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        ST[Streamlit UI]
-        ST1[Bulk Classification]
-        ST2[Interactive Agent]
-        ST3[Analytics Dashboard]
-        ST --> ST1
-        ST --> ST2
-        ST --> ST3
-    end
-
-    subgraph "AI Processing Layer"
-        TC[Ticket Classifier]
-        RA[RAG Agent]
-        TC --> RA
-    end
-
-    subgraph "Knowledge Management"
-        KB[Enhanced Knowledge Base]
-        EMB[Jina Embeddings]
-        VDB[(Qdrant Vector DB)]
-        KB --> EMB
-        EMB --> VDB
-    end
-
-    subgraph "External Services"
-        GROQ[Groq LLama 3.3-70B]
-        JINA[Jina AI API]
-    end
-
-    subgraph "Support Services"
-        AN[Analytics Service]
-        MON[Monitoring Service]
-        SET[Settings Config]
-    end
-
-    ST1 --> TC
-    ST2 --> TC
-    ST3 --> AN
-    TC --> GROQ
-    RA --> KB
-    RA --> GROQ
-    EMB --> JINA
-    KB --> VDB
-    AN --> MON
-    TC -.-> SET
-    RA -.-> SET
-
-    classDef frontend fill:#e1f5fe
-    classDef ai fill:#f3e5f5
-    classDef knowledge fill:#e8f5e8
-    classDef external fill:#fff3e0
-    classDef support fill:#fce4ec
-
-    class ST,ST1,ST2,ST3 frontend
-    class TC,RA ai
-    class KB,EMB,VDB knowledge
-    class GROQ,JINA external
-    class AN,MON,SET support
-```
+<img width="1091" height="786" alt="image" src="https://github.com/user-attachments/assets/5dad443a-f5f9-4dae-b299-723fc698332e" />
 
 ## 🔧 System Architecture Flow
 
@@ -303,4 +243,5 @@ atlan-helpdesk-ai/
 ```
 
 
-**Built with ❤️ for intelligent customer support automation**
+
+
